@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Fish Control Test</title>
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0878a8;touch-action:none;-webkit-user-select:none;user-select:none;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif}
+canvas{display:block;width:100vw;height:100vh;touch-action:none}
+#status{position:fixed;left:12px;top:max(12px,env(safe-area-inset-top));z-index:5;color:#fff;background:rgba(0,0,0,.25);padding:8px 10px;border-radius:12px;font-size:14px;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="status">Проведи пальцем по экрану</div>
+<script>
+(function(){
+  var canvas=document.getElementById('game');
+  var ctx=canvas.getContext('2d');
+  var W=0,H=0,DPR=1;
+
+  function resize(){
+    W=window.innerWidth||360;
+    H=window.innerHeight||640;
+    DPR=Math.min(window.devicePixelRatio||1,2);
+    canvas.width=Math.round(W*DPR);
+    canvas.height=Math.round(H*DPR);
+    canvas.style.width=W+'px';
+    canvas.style.height=H+'px';
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+  }
+  resize();
+  window.addEventListener('resize',resize);
+
+  var fish={x:W*.5,y:H*.65,a:-Math.PI/2,speed:170,turn:2.6,r:28,tail:0};
+  var target={x:W*.5,y:H*.35};
+
+  function setTarget(x,y){
+    target.x=Math.max(0,Math.min(W,x));
+    target.y=Math.max(0,Math.min(H,y));
+    document.getElementById('status').textContent='Цель: '+Math.round(target.x)+', '+Math.round(target.y);
+  }
+
+  canvas.addEventListener('touchstart',function(e){
+    if(e.touches&&e.touches[0]) setTarget(e.touches[0].clientX,e.touches[0].clientY);
+    e.preventDefault();
+  },{passive:false});
+  canvas.addEventListener('touchmove',function(e){
+    if(e.touches&&e.touches[0]) setTarget(e.touches[0].clientX,e.touches[0].clientY);
+    e.preventDefault();
+  },{passive:false});
+
+  canvas.addEventListener('pointerdown',function(e){setTarget(e.clientX,e.clientY);e.preventDefault();});
+  canvas.addEventListener('pointermove',function(e){if(e.pointerType==='touch'||e.buttons) setTarget(e.clientX,e.clientY);e.preventDefault();});
+
+  function norm(a){
+    while(a>Math.PI)a-=Math.PI*2;
+    while(a<-Math.PI)a+=Math.PI*2;
+    return a;
+  }
+
+  function update(dt){
+    var dx=target.x-fish.x;
+    var dy=target.y-fish.y;
+    var dist=Math.sqrt(dx*dx+dy*dy);
+    if(dist>8){
+      var wanted=Math.atan2(dy,dx);
+      var diff=norm(wanted-fish.a);
+      var maxTurn=fish.turn*dt;
+      if(diff>maxTurn)diff=maxTurn;
+      if(diff<-maxTurn)diff=-maxTurn;
+      fish.a=norm(fish.a+diff);
+
+      var speed=fish.speed;
+      if(dist<85)speed*=Math.max(.18,dist/85);
+      fish.x+=Math.cos(fish.a)*speed*dt;
+      fish.y+=Math.sin(fish.a)*speed*dt;
+      fish.tail+=dt*13;
+    }
+    if(fish.x<30)fish.x=30;
+    if(fish.x>W-30)fish.x=W-30;
+    if(fish.y<55)fish.y=55;
+    if(fish.y>H-55)fish.y=H-55;
+  }
+
+  function drawFish(){
+    ctx.save();
+    ctx.translate(fish.x,fish.y);
+    ctx.rotate(fish.a);
+    var swing=Math.sin(fish.tail)*8;
+    ctx.fillStyle='#e8862f';
+    ctx.beginPath();
+    ctx.moveTo(-28,0);ctx.lineTo(-54,-22+swing);ctx.lineTo(-47,0);ctx.lineTo(-54,22+swing);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#ffb03f';
+    ctx.beginPath();ctx.ellipse(0,0,33,20,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#ffe2aa';
+    ctx.beginPath();ctx.ellipse(10,5,16,8,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(18,-7,6,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#162b35';ctx.beginPath();ctx.arc(20,-7,2.5,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+  }
+
+  function draw(){
+    var g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,'#1098c9');g.addColorStop(.58,'#087aaa');g.addColorStop(1,'#07516e');
+    ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#ccb27a';ctx.fillRect(0,H-42,W,42);
+
+    ctx.strokeStyle='rgba(255,255,255,.35)';ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(fish.x,fish.y);ctx.lineTo(target.x,target.y);ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,.3)';ctx.beginPath();ctx.arc(target.x,target.y,16,0,Math.PI*2);ctx.fill();
+    drawFish();
+  }
+
+  var last=performance.now();
+  function loop(now){
+    var dt=Math.min(.033,(now-last)/1000);last=now;
+    update(dt);draw();requestAnimationFrame(loop);
+  }
+  draw();requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
